@@ -10,9 +10,6 @@
  *   GET /health
  *   GET /lumora/v1/resolve?type=movie|tv&tmdb=ID[&season=S&episode=E][&imdb=tt…][&title=…][&year=YYYY]
  *     → { sources: [ { label, type, url, quality, audio, lang } ] }
- *
- * Hosts used here must be approved in LUMORA (PROVIDER_ALLOWED_HOSTS, /addhost,
- * or the pending-host approval flow).
  */
 
 const http = require('node:http');
@@ -21,11 +18,11 @@ const { URL } = require('node:url');
 const PORT = Number(process.env.PORT) || 3100;
 const HOST = process.env.HOST || '127.0.0.1';
 
-/** @typedef {{ label: string, type: 'embed'|'mp4'|'hls', url: string, quality?: string, audio?: string, lang?: string }} Source */
+// Qualities to offer in the Lumora UI
+const AVAILABLE_QUALITIES = ['480p', '720p', '1080p'];
 
 /**
  * Provider definitions. Each builds one or more embed URLs for a title.
- * Patterns follow the public multi-embed sites commonly used by community clients.
  */
 const PROVIDERS = [
   {
@@ -140,7 +137,6 @@ const PROVIDERS = [
 ];
 
 function buildSources(type, tmdbId, season, episode) {
-  /** @type {Source[]} */
   const out = [];
   const seen = new Set();
 
@@ -159,29 +155,37 @@ function buildSources(type, tmdbId, season, episode) {
     for (const entry of entries) {
       if (!entry || !entry.host || !entry.path) continue;
       const url = `https://${entry.host}${entry.path.startsWith('/') ? entry.path : '/' + entry.path}`;
-      if (seen.has(url)) continue;
-      seen.add(url);
+      
+      // Instead of just one link, we generate a link for each quality tier
+      for (const quality of AVAILABLE_QUALITIES) {
+        // Create a unique key to prevent duplicates
+        const uniqueKey = `${url}-${quality}`;
+        if (seen.has(uniqueKey)) continue;
+        seen.add(uniqueKey);
 
-      out.push({
-        label: `${p.label}`,
-        type: 'embed',
-        url,
-        quality: '1080p',
-        audio: 'multi',
-        lang: 'en'
-      });
+        out.push({
+          label: `${p.label} (${quality})`,
+          type: 'embed', // 'embed' tells Lumora to load the iframe
+          url: url,
+          quality: quality,
+          audio: 'multi',
+          lang: 'en',
+          downloadable: true, // Tells Lumora to show the Download button
+          headers: { 'Referer': `https://${entry.host}/` } // Helps bypass some basic hotlink protection
+        });
+      }
     }
   }
 
   // Prefer a stable ordering: known high-coverage providers first
   const priority = ['VidSrc', 'AutoEmbed', '2Embed', 'MultiEmbed', 'EmbedSu', 'VidLink', 'SmashyStream', 'MoviesAPI', 'Vidora'];
   out.sort((a, b) => {
-    const ia = priority.indexOf(a.label);
-    const ib = priority.indexOf(b.label);
+    const ia = priority.findIndex(p => a.label.startsWith(p));
+    const ib = priority.findIndex(p => b.label.startsWith(p));
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
-  return out.slice(0, 24);
+  return out.slice(0, 30); // Increased limit to accommodate the quality variations
 }
 
 function send(res, status, body) {
@@ -210,7 +214,7 @@ const server = http.createServer((req, res) => {
     return send(res, 200, {
       ok: true,
       name: 'universal-multi-provider',
-      version: '1.0.0',
+      version: '1.1.0',
       providers: PROVIDERS.map((p) => p.id)
     });
   }
