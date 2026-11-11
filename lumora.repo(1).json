@@ -1,0 +1,26 @@
+{
+  "name": "Universal Multi-Provider",
+  "description": "Movies, series and anime embeds from popular public multi-embed providers (VidSrc, AutoEmbed, 2Embed, MultiEmbed, Smashy, VidLink and more). Approve hosts via /pending or /addhost if any are missing.",
+  "entry": "index.js",
+  "healthPath": "/health",
+  "hosts": [
+    "vidsrc.to",
+    "vidsrc.xyz",
+    "vidsrc.me",
+    "vidsrc.cc",
+    "vidsrc.pm",
+    "vidsrc.net",
+    "autoembed.co",
+    "player.autoembed.cc",
+    "2embed.cc",
+    "www.2embed.cc",
+    "multiembed.mov",
+    "www.multiembed.mov",
+    "embed.su",
+    "moviesapi.club",
+    "vidlink.pro",
+    "embed.smashystream.com",
+    "player.smashy.stream",
+    "vidora.su"
+  ]
+}
